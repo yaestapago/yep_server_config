@@ -1,0 +1,132 @@
+{
+  "title": "Nginx — Tráfico y Errores",
+  "uid": "nginx-logs-yp",
+  "tags": ["nginx", "logs"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests por minuto",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_uid}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"nginx\"}[1m])) by (status)",
+          "legendFormat": "HTTP {{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 15, "lineWidth": 2 }
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "^HTTP 2.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "#3FB950", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^HTTP 4.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F78120", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^HTTP 5.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF7B72", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 2,
+      "title": "Errores 4xx y 5xx",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_uid}" },
+      "targets": [
+        {
+          "expr": "sum(rate({job=\"nginx\"} | json | status >= \"400\" [1m])) by (status)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "color": { "fixedColor": "#FF7B72", "mode": "fixed" }, "custom": { "fillOpacity": 20, "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Logs en tiempo real",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 14 },
+      "datasource": { "type": "loki", "uid": "${loki_uid}" },
+      "targets": [
+        {
+          "expr": "{job=\"nginx\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 4,
+      "title": "Métodos HTTP",
+      "type": "piechart",
+      "gridPos": { "x": 0, "y": 22, "w": 8, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_uid}" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"nginx\"} | logfmt | method != \"\" [1h])) by (method)",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Códigos de respuesta",
+      "type": "piechart",
+      "gridPos": { "x": 8, "y": 22, "w": 8, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_uid}" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"nginx\"} | logfmt | status != \"\" [1h])) by (status)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Solo Errores (4xx / 5xx)",
+      "type": "logs",
+      "gridPos": { "x": 16, "y": 22, "w": 8, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${loki_uid}" },
+      "targets": [
+        {
+          "expr": "{job=\"nginx\"} | regexp `\" (?P<status>[45]\\d{2}) `",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "loki_uid",
+        "type": "datasource",
+        "query": "loki",
+        "hide": 2,
+        "current": {}
+      }
+    ]
+  },
+  "schemaVersion": 38
+}

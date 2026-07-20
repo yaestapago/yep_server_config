@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /opt/yaestapago/stage remote -v)",
+      "Bash(git -C /opt/yaestapago/stage branch -vv)",
+      "Bash(git -C /opt/yaestapago/stage status)",
+      "Bash(git -C /opt/yaestapago/stage log -1 --oneline)",
+      "Bash(git ls-remote *)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(git config *)",
+      "Read(//home/ubuntu/.ssh/**)",
+      "Bash(git --version)",
+      "Bash(git help *)",
+      "Bash(col -b)",
+      "Read(//home/ubuntu/**)",
+      "Bash(gh auth *)"
+    ]
+  }
+}

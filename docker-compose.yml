@@ -1,0 +1,97 @@
+services:
+
+  # ── PRODUCCIÓN ──────────────────────────────────────────────────────────────
+  api-prod:
+    build:
+      context: ./prod
+      dockerfile: Dockerfile
+    container_name: api-prod
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file: /etc/yaestapago/prod.env
+    networks:
+      - prod-net
+    depends_on:
+      piper-prod:
+        condition: service_started
+    volumes:
+      - tts_cache_prod:/app/.cache/tts
+    deploy:
+      resources:
+        limits:
+          cpus: "3.5"
+          memory: 7G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Sidecar TTS (Piper) para /source-events/:id/tts en prod. Sin puerto
+  # publicado al host: solo lo consume api-prod por la red interna.
+  piper-prod:
+    build:
+      context: ./piper
+    container_name: piper-prod
+    restart: always
+    expose:
+      - "5000"
+    networks:
+      - prod-net
+
+  # ── STAGING ─────────────────────────────────────────────────────────────────
+  api-stage:
+    build:
+      context: ./stage
+      dockerfile: Dockerfile
+    container_name: api-stage
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    env_file: /etc/yaestapago/stage.env
+    networks:
+      - stage-net
+    depends_on:
+      piper-stage:
+        condition: service_started
+    volumes:
+      - tts_cache_stage:/app/.cache/tts
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 3G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Sidecar TTS (Piper) para /source-events/:id/tts en stage. Sin puerto
+  # publicado al host: solo lo consume api-stage por la red interna.
+  piper-stage:
+    build:
+      context: ./piper
+    container_name: piper-stage
+    restart: unless-stopped
+    expose:
+      - "5000"
+    networks:
+      - stage-net
+
+networks:
+  prod-net:
+    driver: bridge
+  stage-net:
+    driver: bridge
+
+volumes:
+  tts_cache_stage:
+  tts_cache_prod:

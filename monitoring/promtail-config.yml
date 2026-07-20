@@ -1,0 +1,47 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+
+  # ── Logs de contenedores Docker (api-prod, api-stage y demás) ───────────────
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Nombre del contenedor sin el slash inicial
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # Stream (stdout / stderr)
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'logstream'
+      # Label env: extrae "prod" de "api-prod" y "stage" de "api-stage"
+      - source_labels: ['container']
+        regex: 'api-(prod|stage)'
+        target_label: 'env'
+        replacement: '${1}'
+
+  # ── Logs de Nginx (access + error) ──────────────────────────────────────────
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          __path__: /var/log/nginx/*.log
+    pipeline_stages:
+      # Parsear el formato Combined Log de Nginx para extraer el status HTTP
+      - regex:
+          expression: '^(?P<remote_addr>[\d.]+) - \S+ \[[^\]]+\] "(?P<method>\S+) (?P<path>\S+)[^"]*" (?P<status>\d+) \d+'
+      - labels:
+          method:
+          status:
