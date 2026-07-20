@@ -1,0 +1,24 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Editores
+.vscode/
+.idea/
+
+# Env files (defensa en profundidad; los reales viven en /etc/yaestapago/)
+.env
+.env.local
+.env.*.local
+
+# Backups/scratch
+*.bak
+*.bak.*
+*.orig
+
+# Artefactos genéricos (piper/ es Python, por si acaso)
+__pycache__/
+*.pyc
