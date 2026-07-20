@@ -2,6 +2,23 @@
 
 API NestJS corriendo en un VPS (6 vCPU / 12 GB RAM) con dos entornos en Docker.
 
+---
+
+## Clonar este repositorio
+
+`prod/` y `stage/` son submódulos git (apuntan a `yep_api_core`, en `main` y
+`develop` respectivamente). Para clonar con todo incluido:
+
+```bash
+git clone --recurse-submodules https://github.com/yaestapago/yep_server_config.git
+```
+
+Si ya clonaste sin `--recurse-submodules`:
+
+```bash
+git submodule update --init --recursive
+```
+
 | Entorno | Branch      | Puerto | Recursos             |
 |---------|-------------|--------|----------------------|
 | prod    | `main`      | `3000` | 3.5 vCPU / 7 GB RAM |
@@ -103,6 +120,9 @@ make seed-prod
 - `stage` usa `restart: unless-stopped` — no se levanta si lo detuviste manualmente.
 - Los seeds son idempotentes: re-ejecutarlos actualiza sin duplicar datos.
 - Los logs de prod se rotan automáticamente (máx 5 archivos × 20 MB).
+- Cuando `make update-prod`/`make update-stage` avanza el commit de `prod`/`stage`,
+  el puntero de submódulo en este repo (`yep_server_config`) queda desactualizado
+  hasta que se haga `git add prod` (o `stage`) `&& git commit` acá en la raíz.
 
 ---
 
@@ -123,11 +143,11 @@ make seed-prod
 │   ├── seed-stage.sh               # Seeds en base de datos stage
 │   ├── clean.sh                    # Limpieza de Docker
 │   └── status.sh                   # Estado y recursos
-├── prod/                           # Código branch main
+├── prod/                           # Submódulo git → yep_api_core @ main
 │   ├── Dockerfile
 │   ├── scripts/seeds/              # Seeds de prod
 │   └── .env.example
-└── stage/                          # Código branch develop
+└── stage/                          # Submódulo git → yep_api_core @ develop
     ├── Dockerfile
     ├── scripts/seeds/              # Seeds de stage
     └── .env.example
