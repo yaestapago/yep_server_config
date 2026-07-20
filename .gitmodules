@@ -1,0 +1,8 @@
+[submodule "prod"]
+	path = prod
+	url = https://github.com/yaestapago/yep_api_core.git
+	branch = main
+[submodule "stage"]
+	path = stage
+	url = https://github.com/yaestapago/yep_api_core.git
+	branch = develop
