@@ -4,6 +4,9 @@ ROOT := $(shell pwd)
 COMPOSE         := docker compose -f $(ROOT)/docker-compose.yml
 COMPOSE_MON     := docker compose -f $(ROOT)/docker-compose.monitoring.yml
 
+# Rama a desplegar en stage. Uso: make update-stage BRANCH=feature/mi-rama
+BRANCH ?= develop
+
 .DEFAULT_GOAL := help
 
 .PHONY: help up down status logs-prod logs-stage \
@@ -37,6 +40,7 @@ help:
 	@echo "  ─────────────────────────────────────────"
 	@echo "  make restart-stage   Reiniciar stage (sin rebuild)"
 	@echo "  make update-stage    git pull develop → rebuild → restart"
+	@echo "  make update-stage BRANCH=mi-rama   Igual, pero con otra rama"
 	@echo "  make logs-stage      Ver logs en tiempo real"
 	@echo "  make build-stage     Solo rebuild stage"
 	@echo "  make seed-stage      Correr seeds en base de datos stage"
@@ -86,9 +90,9 @@ restart-stage:
 update-prod:
 	@bash $(ROOT)/scripts/update-prod.sh
 
-## git pull develop → rebuild → restart stage
+## git pull develop (o BRANCH=<rama>) → rebuild → restart stage
 update-stage:
-	@bash $(ROOT)/scripts/update-stage.sh
+	@BRANCH=$(BRANCH) bash $(ROOT)/scripts/update-stage.sh
 
 ## Solo rebuild prod (sin restart)
 build-prod:

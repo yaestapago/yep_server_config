@@ -2,13 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+STAGE_DIR="$ROOT/stage"
+BRANCH="${BRANCH:-develop}"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Actualizando STAGE (branch: develop)"
+echo "  Actualizando STAGE (branch: $BRANCH)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-echo "[1/4] Pulling código..."
-git -C "$ROOT/stage" pull origin develop
+echo "[1/4] Fetch + checkout de '$BRANCH'..."
+git -C "$STAGE_DIR" fetch origin "$BRANCH"
+git -C "$STAGE_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
 
 echo "[2/4] Construyendo imagen..."
 docker compose -f "$ROOT/docker-compose.yml" build --no-cache api-stage
@@ -21,4 +24,8 @@ sleep 3
 docker compose -f "$ROOT/docker-compose.yml" ps api-stage
 
 echo ""
-echo "✓ STAGE actualizado correctamente"
+echo "✓ STAGE actualizado correctamente (branch: $BRANCH)"
+if [ "$BRANCH" != "develop" ]; then
+	echo "  Nota: stage está corriendo una rama distinta de develop."
+	echo "  Para volver a develop: make update-stage"
+fi

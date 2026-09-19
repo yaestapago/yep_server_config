@@ -51,10 +51,15 @@ git submodule update --init --recursive
 | Comando               | Qué hace                                                                       |
 |-----------------------|--------------------------------------------------------------------------------|
 | `make update-stage`   | 1. `git pull develop` en `/stage` · 2. Rebuild imagen · 3. Restart contenedor |
+| `make update-stage BRANCH=mi-rama` | Igual, pero hace checkout de `mi-rama` (cualquier rama del repo) en vez de `develop` |
 | `make restart-stage`  | Reinicia el contenedor sin rebuild (segundos)                                  |
 | `make build-stage`    | Rebuild de la imagen sin reiniciar                                             |
 | `make logs-stage`     | Sigue los logs de stage en tiempo real (Ctrl+C para salir)                    |
 | `make seed-stage`     | Carga los seeds en la BD de stage (mechanisms, banks) — idempotente            |
+
+> `make update-stage BRANCH=...` deja el submódulo `stage/` apuntando a esa rama.
+> Para volver a la rama normal de stage simplemente corré `make update-stage`
+> (sin `BRANCH`), que vuelve a hacer checkout de `develop`.
 
 ### Mantenimiento
 
