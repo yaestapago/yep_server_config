@@ -77,13 +77,45 @@ git submodule update --init --recursive
 | `make mon-logs`    | Sigue los logs del stack de monitoreo           |
 | `make mon-status`  | Estado de los contenedores de monitoreo         |
 
+Grafana: https://grafana.yaestapago.co — carpetas **Prod**, **Stage**, **Servidor** y **Alertas**.
+
+- `Prod — HTTP y API` / `Stage — HTTP y API`: disponibilidad, req/s por status,
+  latencia p50/p95/p99, endpoints (volumen, lentos, 4xx/5xx), IPs/países/clientes,
+  CPU/RAM del contenedor y logs de la API.
+- `Servidor — Host y Seguridad`: CPU/RAM/disco/red, contenedores, sondas y TLS,
+  SSH (fallidos, top IPs/usuarios, logins), fail2ban, escáneres (404) y 401.
+- Dashboards y alertas se generan con `python3 monitoring/grafana/generate.py`
+  (no editar los JSON/YAML a mano). Dashboards se recargan solos; alertas con
+  `docker restart grafana`.
+- Las alertas van por email a `GF_ALERT_EMAIL` (`/etc/yaestapago/monitoring.env`)
+  vía SMTP de SES.
+- Fuente HTTP: log JSON de nginx (`/var/log/nginx/access_json.log`) con IP real
+  del cliente (CF-Connecting-IP), país, host→env y tiempos. Sin query string.
+
+### Seguridad del host
+
+- **Firewall (ufw):** entrada denegada por defecto. Abiertos: `22/tcp` y `80,443/tcp`
+  **solo desde rangos de Cloudflare** (`scripts/update-cloudflare-ips.sh`, cron semanal
+  en `/etc/cron.weekly/yep-cloudflare-ips`). Si un subdominio deja de pasar por el
+  proxy de Cloudflare (nube gris), deja de responder.
+- Las APIs publican `127.0.0.1:3000/3001` (solo nginx llega a ellas); Grafana `127.0.0.1:3200`.
+- **nginx:** `server_tokens off`; requests a Host desconocido / IP pelada → 444 (80) o
+  handshake TLS rechazado (443). Archivos fuente en `host/nginx/`.
+- **SSH:** `host/ssh/99-yep-hardening.conf` (sin root, 3 intentos, sin X11).
+  `PasswordAuthentication` sigue activo hasta cargar una llave en
+  `~/.ssh/authorized_keys`; luego crear `/etc/ssh/sshd_config.d/00-yep-nopassword.conf`
+  con `PasswordAuthentication no` (00 gana sobre 50-cloud-init), `sshd -t` y
+  `systemctl reload ssh` **sin cerrar la sesión actual** hasta probar la llave.
+- **fail2ban:** jail `sshd` (`host/fail2ban/jail.local`), baneo incremental vía ufw.
+  `sudo fail2ban-client status sshd` · desbanear: `sudo fail2ban-client set sshd unbanip <IP>`.
+
 ---
 
 ## Flujo de trabajo típico
 
 ```
-Código nuevo en develop  →  make update-stage  →  pruebas en :3001
-Merge a main             →  make update-prod   →  live en :3000
+Código nuevo en develop  →  make update-stage  →  pruebas en api-stage.yaestapago.co
+Merge a main             →  make update-prod   →  live en api.yaestapago.co
 ```
 
 Para datos de referencia nuevos (mechanisms, banks):
@@ -137,6 +169,12 @@ make seed-prod
 /opt/yaestapago/
 ├── docker-compose.yml              # Orquestación con límites de recursos
 ├── docker-compose.monitoring.yml   # Stack de monitoreo
+├── monitoring/                     # Prometheus, Loki, promtail, blackbox, Grafana
+│   └── grafana/generate.py         # Genera dashboards + alertas
+├── host/                           # Config del host (copias versionadas)
+│   ├── nginx/                      # conf.d/ (log JSON) y sites/default (catch-all)
+│   ├── ssh/                        # sshd_config.d/99-yep-hardening.conf
+│   └── fail2ban/                   # jail.local
 ├── Makefile                        # Comandos rápidos
 ├── README.md                       # Este archivo
 ├── scripts/
@@ -147,6 +185,7 @@ make seed-prod
 │   ├── seed-prod.sh                # Seeds en base de datos prod
 │   ├── seed-stage.sh               # Seeds en base de datos stage
 │   ├── clean.sh                    # Limpieza de Docker
+│   ├── update-cloudflare-ips.sh    # Rangos CF → nginx real_ip + ufw
 │   └── status.sh                   # Estado y recursos
 ├── prod/                           # Submódulo git → yep_api_core @ main
 │   ├── Dockerfile

@@ -45,6 +45,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log/nginx:/var/log/nginx:ro
+      # auth.log (SSH/sudo) y fail2ban.log. Directorio entero para sobrevivir a logrotate.
+      - /var/log:/var/log/host:ro
+      - promtail_data:/var/lib/promtail
     networks:
       - monitoring-net
     depends_on:
@@ -63,6 +66,17 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+    networks:
+      - monitoring-net
+
+  # ── Blackbox Exporter — sondas HTTP externas (uptime, latencia, TLS) ───────
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox
+    restart: unless-stopped
+    command: --config.file=/etc/blackbox/config.yml
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox/config.yml:ro
     networks:
       - monitoring-net
 
@@ -98,7 +112,9 @@ services:
     volumes:
       - /:/rootfs:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - /run/containerd/containerd.sock:/run/containerd/containerd.sock
+      # Directorio (no el socket suelto): si containerd se reinicia, un bind
+      # de archivo queda apuntando al socket viejo y cAdvisor pierde contenedores.
+      - /run/containerd:/run/containerd
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
@@ -113,3 +129,4 @@ volumes:
   grafana_data:
   loki_data:
   prometheus_data:
+  promtail_data:

@@ -15,3 +15,28 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+
+  - job_name: 'blackbox'
+    static_configs:
+      - targets: ['blackbox:9115']
+
+  # Sondas de uptime: label env=prod|stage|monitoring para los dashboards/alertas.
+  - job_name: 'probe-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['https://api.yaestapago.co/health']
+        labels: {env: prod, service: api}
+      - targets: ['https://api-stage.yaestapago.co/health']
+        labels: {env: stage, service: api}
+      - targets: ['https://grafana.yaestapago.co/api/health']
+        labels: {env: monitoring, service: grafana}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115

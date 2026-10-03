@@ -1,11 +1,14 @@
 apiVersion: 1
 
+# Una carpeta de Grafana por subdirectorio: Prod/, Stage/, Servidor/.
+# Los JSON se generan con monitoring/grafana/generate.py.
 providers:
   - name: provisioned
     orgId: 1
-    folder: Yaestapago
     type: file
     disableDeletion: false
+    allowUiUpdates: false
     updateIntervalSeconds: 30
     options:
       path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

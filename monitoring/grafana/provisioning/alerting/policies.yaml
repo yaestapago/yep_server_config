@@ -1,0 +1,33 @@
+# Generado por monitoring/grafana/generate.py — no editar a mano.
+apiVersion: 1
+policies:
+- orgId: 1
+  receiver: email-yaestapago
+  group_by:
+  - alertname
+  - env
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+  - receiver: gmail-watch-alerts
+    object_matchers:
+    - - service
+      - '='
+      - gmail
+  - receiver: email-yaestapago
+    object_matchers:
+    - - severity
+      - '='
+      - critical
+    repeat_interval: 1h
+  - receiver: email-yaestapago
+    object_matchers:
+    - - severity
+      - '='
+      - info
+    group_by:
+    - alertname
+    - user
+    - ip
+    repeat_interval: 24h

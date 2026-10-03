@@ -1,0 +1,1075 @@
+# Generado por monitoring/grafana/generate.py — no editar a mano.
+apiVersion: 1
+groups:
+- orgId: 1
+  name: prod
+  folder: Alertas
+  interval: 1m
+  rules:
+  - uid: prod-api-down
+    title: '[PROD] API caída'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: max_over_time(probe_success{env="prod",service="api"}[1m])
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    for: 2m
+    noDataState: Alerting
+    execErrState: Error
+    labels:
+      severity: critical
+      env: prod
+    annotations:
+      summary: La API de prod no responde en /health
+      description: 'La sonda externa a https://api.yaestapago.co/health falla. Revisar: docker ps, docker logs api-prod, nginx.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-5xx-rate
+    title: '[PROD] Tasa de errores 5xx alta'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({job="nginx_access", env="prod", status=~"5.."}[5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: B
+        expr: sum(count_over_time({job="nginx_access", env="prod"}[5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: RA
+      datasourceUid: __expr__
+      model:
+        refId: RA
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: RB
+      datasourceUid: __expr__
+      model:
+        refId: RB
+        type: reduce
+        expression: B
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: math
+        expression: $RA >= 5 && ($RA / ($RB + 0.0001)) > 0.05
+    for: 2m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: critical
+      env: prod
+    annotations:
+      summary: Más del 5% de las respuestas de prod son 5xx
+      description: '{{ $values.RA }} errores 5xx de {{ $values.RB }} requests en los últimos 5 min. Ver tabla ''Endpoints con errores 5xx'' en el dashboard.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-app-errors
+    title: '[PROD] Errores en logs de la API'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({container="api-prod"} |= `"level":"error"` [5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 10
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: prod
+    annotations:
+      summary: Más de 10 errores en logs de api-prod en 5 min
+      description: '{{ $values.B }} líneas level=error en 5 min. Ver panel ''Errores y warnings de la API''.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-mem-limit
+    title: '[PROD] Memoria de api-prod cerca del límite'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: max(container_memory_working_set_bytes{name="api-prod"}) / max(container_spec_memory_limit_bytes{name="api-prod"} > 0)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.9
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: critical
+      env: prod
+    annotations:
+      summary: api-prod usa más del 90% de su límite de memoria
+      description: 'Uso actual: {{ humanizePercentage $values.B.Value }}. Si llega al 100% Docker lo mata (OOM).'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-crashloop
+    title: '[PROD] api-prod reiniciándose'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: sum(changes(container_start_time_seconds{name="api-prod"}[15m])) + count(count_over_time(container_start_time_seconds{name="api-prod"}[15m])) - 1
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 2
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: critical
+      env: prod
+    annotations:
+      summary: api-prod se reinició varias veces en 15 min
+      description: '{{ $values.B }} (re)inicios en 15 min: posible crash loop. Revisar docker logs.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-latency-p95
+    title: '[PROD] Latencia p95 alta'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: quantile_over_time(0.95, {job="nginx_access", env="prod"} | json | path!~"/source-events/stream.*" | unwrap request_time [10m]) by ()
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 3
+    for: 10m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: prod
+    annotations:
+      summary: El p95 de latencia de prod supera 3 s
+      description: 'p95 actual: {{ $values.B }} s (10 min, sin SSE). Ver ''Endpoints más lentos''.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-no-traffic
+    title: '[PROD] Sin tráfico'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 1800
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({job="nginx_access", env="prod"}[30m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    for: 0s
+    noDataState: Alerting
+    execErrState: Error
+    labels:
+      severity: warning
+      env: prod
+    annotations:
+      summary: Prod no recibe requests desde hace 30 min
+      description: Normalmente hay heartbeats de la app cada pocos segundos. Revisar Cloudflare/DNS/nginx.
+      dashboard_url: https://grafana.yaestapago.co/d/yep-prod-http
+    isPaused: false
+  - uid: prod-auth-bruteforce
+    title: '[PROD] Pico de 401 (posible fuerza bruta)'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({job="nginx_access", env="prod", status="401"}[5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 300
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: prod
+    annotations:
+      summary: Más de 300 respuestas 401 en 5 min en prod
+      description: '{{ $values.B }} 401 en 5 min (normal < 110). Ver ''Top IPs'' y considerar regla WAF en Cloudflare.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+- orgId: 1
+  name: stage
+  folder: Alertas
+  interval: 1m
+  rules:
+  - uid: stage-api-down
+    title: '[STAGE] API caída'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: max_over_time(probe_success{env="stage",service="api"}[1m])
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 1
+    for: 5m
+    noDataState: Alerting
+    execErrState: Error
+    labels:
+      severity: warning
+      env: stage
+    annotations:
+      summary: La API de stage no responde en /health
+      description: 'La sonda externa a https://api-stage.yaestapago.co/health falla. Revisar: docker ps, docker logs api-stage, nginx.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-stage-http
+    isPaused: false
+  - uid: stage-5xx-rate
+    title: '[STAGE] Tasa de errores 5xx alta'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({job="nginx_access", env="stage", status=~"5.."}[5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: B
+        expr: sum(count_over_time({job="nginx_access", env="stage"}[5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: RA
+      datasourceUid: __expr__
+      model:
+        refId: RA
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: RB
+      datasourceUid: __expr__
+      model:
+        refId: RB
+        type: reduce
+        expression: B
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: math
+        expression: $RA >= 5 && ($RA / ($RB + 0.0001)) > 0.05
+    for: 2m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: stage
+    annotations:
+      summary: Más del 5% de las respuestas de stage son 5xx
+      description: '{{ $values.RA }} errores 5xx de {{ $values.RB }} requests en los últimos 5 min. Ver tabla ''Endpoints con errores 5xx'' en el dashboard.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-stage-http
+    isPaused: false
+  - uid: stage-app-errors
+    title: '[STAGE] Errores en logs de la API'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({container="api-stage"} |= `"level":"error"` [5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 10
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: stage
+    annotations:
+      summary: Más de 10 errores en logs de api-stage en 5 min
+      description: '{{ $values.B }} líneas level=error en 5 min. Ver panel ''Errores y warnings de la API''.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-stage-http
+    isPaused: false
+  - uid: stage-mem-limit
+    title: '[STAGE] Memoria de api-stage cerca del límite'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: max(container_memory_working_set_bytes{name="api-stage"}) / max(container_spec_memory_limit_bytes{name="api-stage"} > 0)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0.9
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: stage
+    annotations:
+      summary: api-stage usa más del 90% de su límite de memoria
+      description: 'Uso actual: {{ humanizePercentage $values.B.Value }}. Si llega al 100% Docker lo mata (OOM).'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-stage-http
+    isPaused: false
+  - uid: stage-crashloop
+    title: '[STAGE] api-stage reiniciándose'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: sum(changes(container_start_time_seconds{name="api-stage"}[15m])) + count(count_over_time(container_start_time_seconds{name="api-stage"}[15m])) - 1
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 2
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+      env: stage
+    annotations:
+      summary: api-stage se reinició varias veces en 15 min
+      description: '{{ $values.B }} (re)inicios en 15 min: posible crash loop. Revisar docker logs.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-stage-http
+    isPaused: false
+- orgId: 1
+  name: servidor
+  folder: Alertas
+  interval: 1m
+  rules:
+  - uid: host-cpu
+    title: '[SERVIDOR] CPU alta'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])))
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 85
+    for: 10m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+    annotations:
+      summary: CPU del VPS > 85% por 10 min
+      description: 'CPU: {{ $values.B }}%. Ver ''CPU por contenedor''.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: host-memory
+    title: '[SERVIDOR] Memoria baja'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: 100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 10
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: critical
+    annotations:
+      summary: Queda menos del 10% de RAM disponible
+      description: 'Disponible: {{ $values.B }}%. El VPS no tiene swap: riesgo de OOM.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: host-disk-warning
+    title: '[SERVIDOR] Disco / > 85%'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"})
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 85
+    for: 10m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+    annotations:
+      summary: El disco raíz supera el 85%
+      description: 'Uso: {{ $values.B }}%. Liberar con `make clean` (imágenes Docker viejas).'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: host-disk-critical
+    title: '[SERVIDOR] Disco / > 92%'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: 100 * (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"} / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"})
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 92
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: critical
+    annotations:
+      summary: El disco raíz supera el 92%
+      description: 'Uso: {{ $values.B }}%. Con disco lleno se caen Mongo dumps, Loki, Docker y nginx.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: host-disk-fill-24h
+    title: '[SERVIDOR] Disco se llena en < 24h'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/",fstype!="rootfs"}[6h], 86400)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 0
+    for: 30m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: critical
+    annotations:
+      summary: A este ritmo el disco raíz se llena en menos de 24 h
+      description: 'Proyección de espacio libre a 24 h: {{ humanize1024 $values.B.Value }}B.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: tls-expiry
+    title: '[SERVIDOR] Certificado TLS por vencer'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: min((probe_ssl_earliest_cert_expiry - time()) / 86400)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 14
+    for: 1h
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+    annotations:
+      summary: Un certificado TLS vence en menos de 14 días
+      description: 'Días restantes: {{ $values.B }}.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: monitoring-target-down
+    title: '[SERVIDOR] Componente de monitoreo caído'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: prometheus
+      model:
+        refId: A
+        expr: count(up == 0) or vector(0)
+        instant: true
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+    annotations:
+      summary: Prometheus no puede scrapear algún target
+      description: '{{ $values.B }} target(s) caídos. Ver tabla ''Targets de monitoreo''. `make mon-status`.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: ssh-login
+    title: '[SEGURIDAD] Login SSH exitoso'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 300
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum by (user, ip) (count_over_time({job="auth"} |= "Accepted " | regexp `Accepted \S+ for (?P<user>\S+) from (?P<ip>\S+)` [5m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 0
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: info
+    annotations:
+      summary: 'Login SSH: {{ $labels.user }} desde {{ $labels.ip }}'
+      description: Si no fuiste tú, cambia la contraseña y revisa `sudo grep Accepted /var/log/auth.log`.
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false
+  - uid: ssh-bruteforce
+    title: '[SEGURIDAD] Fuerza bruta SSH masiva'
+    condition: C
+    data:
+    - refId: A
+      relativeTimeRange:
+        from: 600
+        to: 0
+      datasourceUid: loki
+      model:
+        refId: A
+        expr: sum(count_over_time({job="auth"} |~ "Failed password|Invalid user|authentication failure" [10m]))
+        queryType: instant
+        intervalMs: 1000
+        maxDataPoints: 43200
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+        settings:
+          mode: replaceNN
+          replaceWithValue: 0
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 500
+    for: 0s
+    noDataState: OK
+    execErrState: Error
+    labels:
+      severity: warning
+    annotations:
+      summary: Más de 500 intentos SSH fallidos en 10 min
+      description: '{{ $values.B }} intentos. fail2ban debería estar baneando: `sudo fail2ban-client status sshd`.'
+      dashboard_url: https://grafana.yaestapago.co/d/yep-server
+    isPaused: false

@@ -8,7 +8,8 @@ services:
     container_name: api-prod
     restart: always
     ports:
-      - "3000:3000"
+      # Solo localhost: el tráfico público entra por nginx (Cloudflare → 443).
+      - "127.0.0.1:3000:3000"
     env_file: /etc/yaestapago/prod.env
     networks:
       - prod-net
@@ -51,7 +52,8 @@ services:
     container_name: api-stage
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      # Solo localhost: el tráfico público entra por nginx (Cloudflare → 443).
+      - "127.0.0.1:3001:3000"
     env_file: /etc/yaestapago/stage.env
     networks:
       - stage-net

@@ -1,0 +1,15 @@
+# Catch-all: cualquier request que no sea a un dominio conocido (escáneres que
+# entran por la IP pelada) se corta sin respuesta. Sin esto, nginx servía
+# Grafana como default en :443.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}

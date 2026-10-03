@@ -1,0 +1,12 @@
+# Generado por monitoring/grafana/generate.py — no editar a mano.
+apiVersion: 1
+contactPoints:
+- orgId: 1
+  name: email-yaestapago
+  receivers:
+  - uid: email-yaestapago
+    type: email
+    disableResolveMessage: false
+    settings:
+      addresses: $GF_ALERT_EMAIL
+      singleEmail: true

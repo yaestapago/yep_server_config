@@ -1,0 +1,17 @@
+# fail2ban — instalado en /etc/fail2ban/jail.local.
+# Solo sshd: el tráfico HTTP llega desde IPs de Cloudflare, así que banear en
+# iptables bloquearía a Cloudflare entero. Para HTTP usar las reglas WAF de CF.
+[DEFAULT]
+banaction = ufw
+backend = systemd
+bantime = 1h
+bantime.increment = true
+bantime.factor = 4
+bantime.maxtime = 4w
+findtime = 10m
+maxretry = 5
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+mode = aggressive
