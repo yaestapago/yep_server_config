@@ -8,16 +8,21 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir piper-tts==1.2.0 flask
 
-# Voz español LATAM (México, calidad media). Piper no publica es_CO.
-ARG VOICE=es_MX-ald-medium
-ARG VOICE_BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX/ald/medium
+# Voces español LATAM (México). Piper no publica es_CO.
+# - es_MX-ald-medium: voz original, sigue siendo la voz por defecto.
+# - es_MX-claude-high: voz elegida en la comparación A/B de oct 2026.
+ARG VOICE_BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_MX
 RUN mkdir -p /voices \
-    && curl -fsSL "${VOICE_BASE}/${VOICE}.onnx" -o "/voices/${VOICE}.onnx" \
-    && curl -fsSL "${VOICE_BASE}/${VOICE}.onnx.json" -o "/voices/${VOICE}.onnx.json"
+    && for v in ald/medium/es_MX-ald-medium claude/high/es_MX-claude-high; do \
+         n="$(basename "$v")"; \
+         curl -fsSL "${VOICE_BASE}/${v}.onnx" -o "/voices/${n}.onnx" \
+         && curl -fsSL "${VOICE_BASE}/${v}.onnx.json" -o "/voices/${n}.onnx.json" || exit 1; \
+       done
 
 # piper-tts==1.2.0 (el paquete pip) no trae `piper.http_server` — solo expone
 # la CLI y la clase PiperVoice. app.py es un wrapper Flask propio que lee
-# `text` del query (GET) o del cuerpo (POST) y responde audio/wav.
+# `text` (y opcionalmente `voice`, `length_scale` y `sentence_silence`) del
+# query (GET) o del cuerpo (POST) y responde audio/wav.
 COPY app.py /app.py
 
 EXPOSE 5000
