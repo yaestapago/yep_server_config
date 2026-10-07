@@ -39,6 +39,8 @@ compactor:
   retention_delete_delay: 2h
   retention_delete_worker_count: 150
   delete_request_store: filesystem
+  # Los deletes (p. ej. purgar secretos filtrados) se aplican a los 10 min, no a las 24h.
+  delete_request_cancel_period: 10m
 
 analytics:
   reporting_enabled: false

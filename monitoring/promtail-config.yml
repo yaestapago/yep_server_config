@@ -30,6 +30,13 @@ scrape_configs:
         regex: '(?:api|piper)-(prod|stage)'
         target_label: 'env'
         replacement: '${1}'
+    pipeline_stages:
+      # Oculta secretos que viajan en la query (?token= del push de Gmail, ticket
+      # SSE, hub.verify_token de Meta...). Misma lista que redactSensitiveQuery
+      # del backend; aquí cubre versiones de la API que aún no redactan.
+      - replace:
+          expression: '(?i)[?&](?:token|access_token|refresh_token|id_token|ticket|hub\.verify_token|key|api_key|apikey|secret|signature|password)=([^&\s"\\]+)'
+          replace: '[REDACTED]'
 
   # ── Nginx access log (JSON, ver host/nginx/conf.d/10-yep-logging.conf) ─────
   # env = prod | stage | monitoring | unknown, según el Host del request.
@@ -63,6 +70,10 @@ scrape_configs:
           src: file
           __path__: /var/log/nginx/error.log
     pipeline_stages:
+      # error.log trae `request: "POST /gmail/push?token=..."`: ver job docker.
+      - replace:
+          expression: '(?i)[?&](?:token|access_token|refresh_token|id_token|ticket|hub\.verify_token|key|api_key|apikey|secret|signature|password)=([^&\s"\\]+)'
+          replace: '[REDACTED]'
       - regex:
           expression: '^(?P<ts>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})'
       - timestamp:
