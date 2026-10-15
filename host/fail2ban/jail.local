@@ -2,6 +2,8 @@
 # Solo sshd: el tráfico HTTP llega desde IPs de Cloudflare, así que banear en
 # iptables bloquearía a Cloudflare entero. Para HTTP usar las reglas WAF de CF.
 [DEFAULT]
+# ignoreip incluye la red Tailscale (100.64.0.0/10): el 22 solo entra por ahí y no
+# queremos banearnos a nosotros mismos por un error de llave.
 banaction = ufw
 backend = systemd
 bantime = 1h
@@ -10,7 +12,7 @@ bantime.factor = 4
 bantime.maxtime = 4w
 findtime = 10m
 maxretry = 5
-ignoreip = 127.0.0.1/8 ::1
+ignoreip = 127.0.0.1/8 ::1 100.64.0.0/10 fd7a:115c:a1e0::/48
 
 [sshd]
 enabled = true
