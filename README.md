@@ -94,20 +94,33 @@ Grafana: https://grafana.yaestapago.co — carpetas **Prod**, **Stage**, **Servi
 
 ### Seguridad del host
 
-- **Firewall (ufw):** entrada denegada por defecto. Abiertos: `22/tcp` y `80,443/tcp`
-  **solo desde rangos de Cloudflare** (`scripts/update-cloudflare-ips.sh`, cron semanal
-  en `/etc/cron.weekly/yep-cloudflare-ips`). Si un subdominio deja de pasar por el
-  proxy de Cloudflare (nube gris), deja de responder.
+- **Acceso SSH (desde 2026-10-15):** solo con llave y solo para `carlosb` y `leofu`
+  (`host/ssh/00-yep-auth.conf`; va como `00-` porque sshd usa el primer valor de cada
+  opción y `50-cloud-init.conf` fija contraseña). El puerto 22 **no está abierto en la
+  IP pública**: se entra por Tailscale (`yep-vps`, `100.122.193.125`). `ubuntu` es cuenta
+  de servicio sin SSH; su contraseña sirve solo para la consola KVM de OVH (acceso de
+  emergencia si Tailscale falla). `sudo` pide contraseña a todos.
+- **Dar acceso a alguien:** `sudo useradd -m -s /bin/bash -G sudo,docker,yep <usuario>`,
+  poner su `.pub` en `/home/<usuario>/.ssh/authorized_keys` (700/600), añadirlo a
+  `AllowUsers` en `00-yep-auth.conf`, `sudo sshd -t && sudo systemctl reload ssh`.
+  Debe estar en la misma red Tailscale.
+- **Firewall (ufw):** entrada denegada por defecto. `22/tcp` solo en la interfaz
+  `tailscale0`; `41641/udp` para Tailscale; `80,443/tcp` **solo desde rangos de
+  Cloudflare** (`scripts/update-cloudflare-ips.sh`, cron semanal en
+  `/etc/cron.weekly/yep-cloudflare-ips`). Si un subdominio deja de pasar por el proxy
+  de Cloudflare (nube gris), deja de responder. Los contenedores no alcanzan el
+  metadato de OVH `169.254.169.254` (cadena `DOCKER-USER`, bloque YEP en
+  `/etc/ufw/after.rules`; copia en `host/ufw/`).
 - Las APIs publican `127.0.0.1:3000/3001` (solo nginx llega a ellas); Grafana `127.0.0.1:3200`.
 - **nginx:** `server_tokens off`; requests a Host desconocido / IP pelada → 444 (80) o
   handshake TLS rechazado (443). Archivos fuente en `host/nginx/`.
-- **SSH:** `host/ssh/99-yep-hardening.conf` (sin root, 3 intentos, sin X11).
-  `PasswordAuthentication` sigue activo hasta cargar una llave en
-  `~/.ssh/authorized_keys`; luego crear `/etc/ssh/sshd_config.d/00-yep-nopassword.conf`
-  con `PasswordAuthentication no` (00 gana sobre 50-cloud-init), `sshd -t` y
-  `systemctl reload ssh` **sin cerrar la sesión actual** hasta probar la llave.
-- **fail2ban:** jail `sshd` (`host/fail2ban/jail.local`), baneo incremental vía ufw.
-  `sudo fail2ban-client status sshd` · desbanear: `sudo fail2ban-client set sshd unbanip <IP>`.
+- **Permisos compartidos:** `/opt/yaestapago` y `/etc/yaestapago/*.env` son del grupo
+  `yep` (setgid, `core.sharedRepository=group`): cada operador usa su propia cuenta y
+  firma sus commits. Si git se queja de "dubious ownership":
+  `git config --global --add safe.directory /opt/yaestapago` (y `prod`, `stage`).
+- **fail2ban:** jail `sshd` (`host/fail2ban/jail.local`), baneo incremental vía ufw;
+  ignora la red Tailscale. `sudo fail2ban-client status sshd` · desbanear:
+  `sudo fail2ban-client set sshd unbanip <IP>`.
 
 ---
 
