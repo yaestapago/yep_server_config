@@ -1,0 +1,7 @@
+# BEGIN YEP DOCKER-USER: los contenedores no alcanzan el metadato de OVH (169.254.169.254)
+*filter
+:DOCKER-USER - [0:0]
+-A DOCKER-USER -d 169.254.169.254/32 -j DROP
+-A DOCKER-USER -j RETURN
+COMMIT
+# END YEP DOCKER-USER
