@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: api-prod
     restart: always
+    stop_grace_period: 40s
     ports:
       # Solo localhost: el tráfico público entra por nginx (Cloudflare → 443).
       - "127.0.0.1:3000:3000"
@@ -51,6 +52,7 @@ services:
       dockerfile: Dockerfile
     container_name: api-stage
     restart: unless-stopped
+    stop_grace_period: 40s
     ports:
       # Solo localhost: el tráfico público entra por nginx (Cloudflare → 443).
       - "127.0.0.1:3001:3000"
